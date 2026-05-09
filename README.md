@@ -6,6 +6,7 @@
 
 This project is built with **Next.js**, a React-based framework that enables server-side rendering, static generation, API routes, and modern frontend tooling.  
 The structure is optimized for clean code, scalability, and deployment on platforms such as Vercel, Netlify, and cloud servers.
+### Live Link: https://ushop-admin.vercel.app
 
 ---
 
