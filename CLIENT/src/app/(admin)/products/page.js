@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react';
-import { Grid3X3, List, Plus, Search, Filter, X, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Grid3X3, List, Plus, Search, Filter, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -31,19 +31,8 @@ import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ui/ProductCard';
+import { api } from '@/hooks/useApi/api';
 
-const initialProducts = [
-  { id: 1, name: 'Wireless Earbuds Pro', category: 'Electronics', price: 69.99, stock: 245, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=400&fit=crop' },
-  { id: 2, name: 'Smart Watch Series 5', category: 'Electronics', price: 199.99, stock: 89, image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=400&h=400&fit=crop' },
-  { id: 3, name: 'Laptop Stand Aluminum', category: 'Accessories', price: 29.99, stock: 156, image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop' },
-  { id: 4, name: 'Mechanical Keyboard', category: 'Electronics', price: 89.99, stock: 4, image: 'https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=400&h=400&fit=crop' },
-  { id: 5, name: 'USB-C Hub 7-in-1', category: 'Accessories', price: 39.99, stock: 78, image: 'https://images.unsplash.com/photo-1625723044792-44de16ccb4e9?w=400&h=400&fit=crop' },
-  { id: 6, name: 'Noise Cancelling Headphones', category: 'Electronics', price: 149.99, stock: 32, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop' },
-  { id: 7, name: 'Wireless Charging Pad', category: 'Accessories', price: 24.99, stock: 2, image: 'https://images.unsplash.com/photo-1586816879360-004f5b0c51e5?w=400&h=400&fit=crop' },
-  { id: 8, name: 'Portable SSD 1TB', category: 'Storage', price: 119.99, stock: 45, image: 'https://images.unsplash.com/photo-1597848212624-a19eb35e2651?w=400&h=400&fit=crop' },
-];
-
-const categories = ['All', 'Electronics', 'Accessories', 'Storage'];
 const priceRanges = [
   { label: 'All Prices', min: 0, max: Infinity },
   { label: 'Under ৳500', min: 0, max: 500 },
@@ -68,20 +57,44 @@ const sortOptions = [
 
 const Products = () => {
   const router = useRouter();
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [category, setCategory] = useState('All');
   const [priceRange, setPriceRange] = useState(0);
   const [stockFilter, setStockFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name-asc');
   const [deleteProduct, setDeleteProduct] = useState(null);
 
+  // Fetch real products from API
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get('/AllProducts');
+      setProducts(data.map(p => ({
+        id: p._id,
+        name: p.title,
+        category: p.brand || 'Uncategorized',
+        price: p.price,
+        stock: p.stock,
+        image: p.images?.[0]?.url || '',
+        description: p.description,
+      })));
+    } catch (err) {
+      console.log('Failed to fetch products:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredProducts = products
     .filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = category === 'All' || product.category === category;
       const matchesPrice = product.price >= priceRanges[priceRange].min && 
         product.price < priceRanges[priceRange].max;
       const matchesStock = stockFilter === 'all' ||
@@ -89,7 +102,7 @@ const Products = () => {
         (stockFilter === 'low' && product.stock > 0 && product.stock < 10) ||
         (stockFilter === 'out' && product.stock === 0);
       
-      return matchesSearch && matchesCategory && matchesPrice && matchesStock;
+      return matchesSearch && matchesPrice && matchesStock;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -103,10 +116,6 @@ const Products = () => {
       }
     });
 
-  const handleEditProduct = (productId) => {
-    router.push(`/products/edit/${productId}`);
-  };
-
   const handleViewProduct = (productId) => {
     router.push(`/products/${productId}`);
   };
@@ -115,24 +124,35 @@ const Products = () => {
     setDeleteProduct(product);
   };
 
-  const confirmDelete = () => {
-    setProducts(prev => prev.filter(p => p.id !== deleteProduct.id));
-    // toast({
-    //   title: "Product deleted",
-    //   description: `${deleteProduct.name} has been deleted successfully.`,
-    // });
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/DeleteProduct/${deleteProduct.id}`);
+      setProducts(prev => prev.filter(p => p.id !== deleteProduct.id));
+    } catch (err) {
+      console.log('Delete failed:', err.message);
+    }
     setDeleteProduct(null);
   };
 
   const clearFilters = () => {
-    setCategory('All');
     setPriceRange(0);
     setStockFilter('all');
     setSortBy('name-asc');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = category !== 'All' || priceRange !== 0 || stockFilter !== 'all' || sortBy !== 'name-asc';
+  const hasActiveFilters = priceRange !== 0 || stockFilter !== 'all' || sortBy !== 'name-asc';
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <PageHeader title="Products" subtitle="Loading..." />
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -182,20 +202,6 @@ const Products = () => {
                 <SheetTitle>Filter Products</SheetTitle>
               </SheetHeader>
               <div className="p-6 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Price Range</label>
                   <Select value={priceRange.toString()} onValueChange={(v) => setPriceRange(parseInt(v))}>
@@ -251,12 +257,6 @@ const Products = () => {
         {/* Active Filters Pills */}
         {hasActiveFilters && (
           <div className="flex flex-wrap gap-2 animate-fade-in">
-            {category !== 'All' && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                {category}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => setCategory('All')} />
-              </span>
-            )}
             {priceRange !== 0 && (
               <span className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
                 {priceRanges[priceRange].label}
@@ -311,7 +311,6 @@ const Products = () => {
                 key={product.id} 
                 product={product} 
                 delay={index * 30} 
-                onEdit={handleEditProduct}
                 onDelete={handleDeleteProduct}
                 onClick={() => handleViewProduct(product.id)}
               />
@@ -326,11 +325,17 @@ const Products = () => {
                 className="bg-card rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all duration-300 animate-fade-in flex items-center gap-4 cursor-pointer"
                 style={{ animationDelay: `${index * 30}ms` }}
               >
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-16 h-16 rounded-lg object-cover"
-                />
+                {product.image ? (
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-lg bg-secondary flex items-center justify-center">
+                    <span className="text-muted-foreground text-xs">No img</span>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-sm mb-0.5 truncate">{product.name}</h3>
                   <p className="text-xs text-muted-foreground mb-1">{product.category}</p>
@@ -364,7 +369,7 @@ const Products = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteProduct?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{deleteProduct?.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

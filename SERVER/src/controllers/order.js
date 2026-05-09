@@ -6,22 +6,25 @@ export const GetOrder = async (req, res) => {
         const { id } = req.params;
         const result = await OrderModel.findOne({ _id: id });
         if (!result) {
-            console.log('order not found');
+            return res.status(404).json({ success: false, message: 'Order not found' });
         }
         res.status(200).json(result)
     } catch (err) {
         console.log(err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
+
 export const GetAllOrder = async (req, res) => {
     try {
-        const result = await OrderModel.find();
+        const result = await OrderModel.find().sort({ createdAt: -1 });
         res.status(200).json(result);
     } catch (err) {
         console.log(err.message);
-
+        res.status(500).json({ success: false, message: err.message });
     }
 };
+
 export const AddOrder = async (req, res) => {
     const {
         user,
@@ -35,51 +38,85 @@ export const AddOrder = async (req, res) => {
         orderStatus,
         isPaid
     } = req.body;
-    const orderData = {
-        user,
-        items,
-        shippingAddress,
-        paymentMethod,
-        itemsPrice,
-        shippingPrice,
-        discountPrice,
-        totalPrice,
-        orderStatus,
-        isPaid
-    }
+
     try {
-        const order = await OrderModel.create(orderData)
-        const result = await customerModel.findByIdAndUpdate(
-            { _id: user },
-            { $set: { orders: [...prev, _id] } }
-        )
-        if (!order) {
-            res.status(500).json('order placement failed')
-        } else if (!result) {
-            res.status(500).json('order placed but customer data update failed')
-        } else {
-            res.status(200).json('order placed!')
+        let customerId = user;
+
+        // If no existing customer selected, auto-create one
+        if (!customerId && shippingAddress?.fullName) {
+            // Check if customer with same phone already exists
+            let existingCustomer = null;
+            if (shippingAddress.phone) {
+                existingCustomer = await customerModel.findOne({ phone: shippingAddress.phone });
+            }
+
+            if (existingCustomer) {
+                customerId = existingCustomer._id;
+            } else {
+                // Create new customer from shipping info
+                const newCustomer = await customerModel.create({
+                    fullName: shippingAddress.fullName,
+                    email: `${shippingAddress.fullName.replace(/\s+/g, '.').toLowerCase()}.${Date.now()}@guest.local`,
+                    phone: shippingAddress.phone || '',
+                    address: {
+                        street: shippingAddress.address || '',
+                        city: shippingAddress.city || '',
+                        country: shippingAddress.country || 'Bangladesh',
+                    },
+                });
+                customerId = newCustomer._id;
+                console.log('Auto-created customer:', newCustomer.fullName);
+            }
         }
 
-        res.status(200).json(result);
+        const orderData = {
+            user: customerId,
+            items,
+            shippingAddress,
+            paymentMethod,
+            itemsPrice,
+            shippingPrice,
+            discountPrice,
+            totalPrice,
+            orderStatus,
+            isPaid
+        };
+
+        const order = await OrderModel.create(orderData);
+        if (!order) {
+            return res.status(500).json({ success: false, message: 'Order placement failed' });
+        }
+
+        // Link order to customer
+        if (customerId) {
+            await customerModel.findByIdAndUpdate(
+                customerId,
+                { $push: { orders: order._id } }
+            );
+        }
+
+        res.status(201).json({ success: true, order });
     } catch (err) {
         console.log('Order adding failed :', err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
+
 export const DeleteOrder = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await OrderModel.findOneAndDelete({ _id: id })
+        const result = await OrderModel.findOneAndDelete({ _id: id });
         if (result) {
-            res.status(200).json('Order Deleted.')
+            res.status(200).json({ success: true, message: 'Order deleted' });
         } else {
-            res.status(500).json('Order isn\'t exist in DB')
+            res.status(404).json({ success: false, message: "Order doesn't exist" });
         }
     } catch (err) {
         console.log('Order delete failed. ', err.message);
-
+        res.status(500).json({ success: false, message: err.message });
     }
 };
+
 export const UpdateOrder = async (req, res) => {
     const { id } = req.params;
     try {
@@ -89,11 +126,12 @@ export const UpdateOrder = async (req, res) => {
             { new: true, runValidators: true }
         );
         if (result) {
-            res.status(200).json('Order updated')
+            res.status(200).json({ success: true, order: result });
         } else {
-            res.status(500).json('Order not found')
+            res.status(404).json({ success: false, message: 'Order not found' });
         }
     } catch (err) {
         console.log(err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
 };
