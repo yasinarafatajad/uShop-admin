@@ -14,105 +14,57 @@ import OrderRow from '../../../components/ui/OrderRow';
 import Image from 'next/image';
 import PageHeader from '@/components/layout/PageHeader';
 import { api } from '@/hooks/useApi/api';
-// import PageHeader from '../../../components/layout/PageHeader';
 
 export const metadata = {
   title: 'Dashboard | Admin Panel',
   description: 'Admin dashboard overview and analytics',
 };
 
-
-
 const dashboard = async () => {
-// Overview Stats card
-  const {data:Stats}  = await api.get('/getStats');  
+  // Fetch stats
+  let Stats = { totalRevenue: 0, totalOrder: 0, totalProduct: 0, totalCustomer: 0 };
+  let recentOrders = [];
+  let topProducts = [];
+
+  try {
+    const { data } = await api.get('/getStats');
+    Stats = data;
+  } catch (err) {
+    console.log('Stats fetch failed:', err.message);
+  }
+
+  try {
+    const { data } = await api.get('/dashboard');
+    recentOrders = data.recentOrders || [];
+    topProducts = data.topProducts || [];
+  } catch (err) {
+    console.log('Dashboard data fetch failed:', err.message);
+  }
+
   const stats = [
     {
       title: 'Total Revenue',
-      value: `৳${Stats?.totalRevenue > 0 ? Stats?.totalRevenue : 0}`,
-      change: '+20.1%',
+      value: `৳${Stats?.totalRevenue > 0 ? Stats.totalRevenue.toLocaleString() : 0}`,
       changeType: 'positive',
       icon: DollarSign,
     },
     {
       title: 'Orders',
-      value: Stats?.totalOrder > 0 ? Stats?.totalOrder : 0,
-      change: '-12.5%',
-      changeType: 'negative',
+      value: Stats?.totalOrder > 0 ? Stats.totalOrder : 0,
+      changeType: 'positive',
       icon: ShoppingCart,
     },
     {
       title: 'Products',
-      value: Stats?.totalProduct > 0 ? Stats?.totalProduct : 0,
-      change: '+3.2%',
+      value: Stats?.totalProduct > 0 ? Stats.totalProduct : 0,
       changeType: 'positive',
       icon: Package,
     },
     {
       title: 'Customers',
-      value: Stats?.totalCustomer > 0 ? Stats?.totalCustomer : 0,
-      change: '+8.1%',
+      value: Stats?.totalCustomer > 0 ? Stats.totalCustomer : 0,
       changeType: 'positive',
       icon: Users,
-    },
-  ];
-
-  const recentOrders = [
-    {
-      id: '3210',
-      customer: 'John Smith',
-      items: 3,
-      total: '129.99',
-      status: 'processing',
-      date: 'Today, 2:30 PM',
-    },
-    {
-      id: '3209',
-      customer: 'Sarah Johnson',
-      items: 1,
-      total: '49.99',
-      status: 'shipped',
-      date: 'Today, 11:15 AM',
-    },
-    {
-      id: '3208',
-      customer: 'Mike Davis',
-      items: 5,
-      total: '289.50',
-      status: 'delivered',
-      date: 'Yesterday',
-    },
-    {
-      id: '3207',
-      customer: 'Emily Brown',
-      items: 2,
-      total: '89.00',
-      status: 'pending',
-      date: 'Yesterday',
-    },
-  ];
-
-  const topProducts = [
-    {
-      name: 'Wireless Earbuds Pro',
-      sales: 245,
-      revenue: '৳12,250',
-      image:
-        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=100&h=100&fit=crop',
-    },
-    {
-      name: 'Smart Watch Series 5',
-      sales: 189,
-      revenue: '৳37,800',
-      image:
-        'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=100&h=100&fit=crop',
-    },
-    {
-      name: 'Laptop Stand Aluminum',
-      sales: 156,
-      revenue: '৳4,680',
-      image:
-        'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=100&h=100&fit=crop',
     },
   ];
 
@@ -178,9 +130,26 @@ const dashboard = async () => {
             </Link>
           </div>
           <div className="space-y-3">
-            {recentOrders.map((order, index) => (
-              <OrderRow key={order.id} order={order} delay={index * 50} />
-            ))}
+            {recentOrders.length > 0 ? (
+              recentOrders.map((order, index) => (
+                <OrderRow
+                  key={order._id}
+                  order={{
+                    id: order._id,
+                    customer: order.shippingAddress?.fullName || 'N/A',
+                    items: order.items?.length || 0,
+                    total: order.totalPrice?.toFixed(2) || '0.00',
+                    status: order.orderStatus || 'pending',
+                    date: new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  }}
+                  delay={index * 50}
+                />
+              ))
+            ) : (
+              <div className="bg-card rounded-xl p-6 shadow-card text-center">
+                <p className="text-muted-foreground text-sm">No orders yet</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -196,30 +165,42 @@ const dashboard = async () => {
             </Link>
           </div>
           <div className="bg-card rounded-xl shadow-card overflow-hidden">
-            {topProducts.map((product, index) => (
-              <div
-                key={product.name}
-                className={`flex items-center gap-4 p-4 ${index !== topProducts.length - 1
-                    ? 'border-b border-border'
-                    : ''
-                  }`}
-              >
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  width={48}
-                  height={48}
-                  className=" rounded-lg object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{product.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {product.sales} sales
-                  </p>
+            {topProducts.length > 0 ? (
+              topProducts.map((product, index) => (
+                <div
+                  key={product._id}
+                  className={`flex items-center gap-4 p-4 ${index !== topProducts.length - 1
+                      ? 'border-b border-border'
+                      : ''
+                    }`}
+                >
+                  {product.images?.[0]?.url ? (
+                    <Image
+                      src={product.images[0].url}
+                      alt={product.title}
+                      width={48}
+                      height={48}
+                      className="rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center">
+                      <Package className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{product.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {product.stock} in stock
+                    </p>
+                  </div>
+                  <span className="font-semibold text-sm">৳{product.price?.toLocaleString()}</span>
                 </div>
-                <span className="font-semibold text-sm">{product.revenue}</span>
+              ))
+            ) : (
+              <div className="p-6 text-center">
+                <p className="text-muted-foreground text-sm">No products yet</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

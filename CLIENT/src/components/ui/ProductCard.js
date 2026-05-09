@@ -1,18 +1,13 @@
-import { MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, Eye, Package } from 'lucide-react';
 import { useState } from 'react';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from './alert-dialog';
 import { useRouter } from 'next/navigation';
+import { api } from '@/hooks/useApi/api';
 
-const ProductCard = ({ product, delay = 0, onEdit, onDelete }) => {
+const ProductCard = ({ product, delay = 0, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -21,7 +16,7 @@ const ProductCard = ({ product, delay = 0, onEdit, onDelete }) => {
   const handleEdit = (e) => {
     e.stopPropagation();
     setShowMenu(false);
-    router.push(`/products/${product.id}/edit`)
+    router.push(`/products/${product.id}/edit`);
   };
 
   const handleView = (e) => {
@@ -38,69 +33,54 @@ const ProductCard = ({ product, delay = 0, onEdit, onDelete }) => {
 
   const handleConfirmDelete = async () => {
     setDeleting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setDeleting(false);
-    setShowDeleteDialog(false);
-    if (onDelete) {
-      onDelete(product);
+    try {
+      await api.delete(`/DeleteProduct/${product.id}`);
+      if (onDelete) onDelete(product);
+    } catch (err) { console.log('Delete failed:', err.message); }
+    finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
   return (
     <>
-      <div 
+      <div
         className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 animate-fade-in group cursor-pointer"
         style={{ animationDelay: `${delay}ms` }}
         onClick={() => router.push(`/products/${product.id}`)}
       >
         <div className="relative aspect-square bg-secondary overflow-hidden">
-          <img 
-            src={product.image} 
-            alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {product.image ? (
+            <img src={product.image} alt={product.name}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Package className="w-10 h-10 text-muted-foreground" />
+            </div>
+          )}
           <div className="absolute top-2 right-2">
             <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(!showMenu);
-                }}
-                className="w-8 h-8 rounded-full bg-card/90 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-card transition-colors"
-              >
+              <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                className="w-8 h-8 rounded-full bg-card/90 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-card transition-colors">
                 <MoreVertical className="w-4 h-4" />
               </button>
               {showMenu && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                    }}
-                  />
+                  <div className="fixed inset-0 z-10"
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
                   <div className="absolute right-0 top-10 w-36 bg-card rounded-lg shadow-modal border border-border py-1 z-20 animate-scale-in">
-                    <button 
-                      onClick={handleView}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View
+                    <button onClick={handleView}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors">
+                      <Eye className="w-4 h-4" /> View
                     </button>
-                    <button 
-                      onClick={handleEdit}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Edit
+                    <button onClick={handleEdit}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-secondary transition-colors">
+                      <Edit className="w-4 h-4" /> Edit
                     </button>
-                    <button 
-                      onClick={handleDeleteClick}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
+                    <button onClick={handleDeleteClick}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors">
+                      <Trash2 className="w-4 h-4" /> Delete
                     </button>
                   </div>
                 </>
@@ -128,16 +108,13 @@ const ProductCard = ({ product, delay = 0, onEdit, onDelete }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{product.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{product.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleting}
-            >
+            <AlertDialogAction onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleting}>
               {deleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
