@@ -1,4 +1,4 @@
-# Project Name : uShop | Dashboard eCommerce
+# Project Name : uShop | Admin eCommerce
 
 ---
 

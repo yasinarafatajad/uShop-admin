@@ -1,5 +1,6 @@
 import OrderModel from '../models/order.js'
 import customerModel from '../models/customer.js'
+import ProductModel from '../models/product.js'
 
 export const GetOrder = async (req, res) => {
     try {
@@ -95,6 +96,19 @@ export const AddOrder = async (req, res) => {
             );
         }
 
+        // Decrease stock for each ordered product
+        const orderItems = req.body.items || [];
+        for (const item of orderItems) {
+            if (item.product) {
+                const updated = await ProductModel.findByIdAndUpdate(
+                    item.product,
+                    { $inc: { stock: -(item.quantity || 1) } },
+                    { new: true }
+                );
+                console.log(`Stock updated for ${item.name}: now ${updated?.stock}`);
+            }
+        }
+
         res.status(201).json({ success: true, order });
     } catch (err) {
         console.log('Order adding failed :', err.message);
@@ -107,6 +121,13 @@ export const DeleteOrder = async (req, res) => {
     try {
         const result = await OrderModel.findOneAndDelete({ _id: id });
         if (result) {
+            // Restore stock for deleted order items
+            for (const item of result.items || []) {
+                await ProductModel.findByIdAndUpdate(
+                    item.product,
+                    { $inc: { stock: item.quantity || 1 } }
+                );
+            }
             res.status(200).json({ success: true, message: 'Order deleted' });
         } else {
             res.status(404).json({ success: false, message: "Order doesn't exist" });
@@ -120,16 +141,29 @@ export const DeleteOrder = async (req, res) => {
 export const UpdateOrder = async (req, res) => {
     const { id } = req.params;
     try {
+        // Get old order to check status change
+        const oldOrder = await OrderModel.findById(id);
+        if (!oldOrder) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
         const result = await OrderModel.findByIdAndUpdate(
             id,
             { $set: req.body },
             { new: true, runValidators: true }
         );
-        if (result) {
-            res.status(200).json({ success: true, order: result });
-        } else {
-            res.status(404).json({ success: false, message: 'Order not found' });
+
+        // If order is being cancelled, restore stock
+        if (req.body.orderStatus === 'cancelled' && oldOrder.orderStatus !== 'cancelled') {
+            for (const item of oldOrder.items || []) {
+                await ProductModel.findByIdAndUpdate(
+                    item.product,
+                    { $inc: { stock: item.quantity || 1 } }
+                );
+            }
         }
+
+        res.status(200).json({ success: true, order: result });
     } catch (err) {
         console.log(err.message);
         res.status(500).json({ success: false, message: err.message });
