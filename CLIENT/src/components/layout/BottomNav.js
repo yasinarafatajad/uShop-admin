@@ -5,6 +5,8 @@ import {
   BarChart3,
   ShoppingCart, 
   Users, 
+  Truck,
+  Tag
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -15,7 +17,8 @@ const navItems = [
   { path: '/orders', icon: ShoppingCart, label: 'Orders' },
   { path: '/customers', icon: Users, label: 'Customers' },
   { path: '/reports', icon: BarChart3, label: 'Reports' },
-  // { path: '/settings', icon: Settings, label: 'Settings' },
+  { path: '/delivery', icon: Truck, label: 'Delivery' },
+  { path: '/coupons', icon: Tag, label: 'Coupons' },
 ];
 
 const BottomNav = () => {

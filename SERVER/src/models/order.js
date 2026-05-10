@@ -37,6 +37,7 @@ const orderSchema = new mongoose.Schema(
     shippingPrice: Number,
     discountPrice: Number,
     totalPrice: Number,
+    couponCode: String,
 
     orderStatus: {
       type: String,

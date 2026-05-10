@@ -14,6 +14,14 @@ const OrderForm = () => {
   const [availableProducts, setAvailableProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [customers, setCustomers] = useState([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [deliveryCharges, setDeliveryCharges] = useState([]);
+  const [selectedChargeId, setSelectedChargeId] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -27,12 +35,17 @@ const OrderForm = () => {
     const fetchData = async () => {
       setLoadingProducts(true);
       try {
-        const [prodRes, custRes] = await Promise.all([
+        const [prodRes, custRes, chargeRes] = await Promise.all([
           api.get('/AllProducts'),
           api.get('/getAllCustomer'),
+          api.get('/deliveryCharges/active')
         ]);
         setAvailableProducts(prodRes.data);
         setCustomers(custRes.data);
+        setDeliveryCharges(chargeRes.data);
+        if (chargeRes.data.length > 0) {
+          setSelectedChargeId(chargeRes.data[0]._id);
+        }
       } catch (err) { console.log('Fetch failed:', err.message); }
       finally { setLoadingProducts(false); }
     };
@@ -42,6 +55,12 @@ const OrderForm = () => {
   const filteredProducts = availableProducts.filter(p =>
     p.title.toLowerCase().includes(productSearch.toLowerCase()) &&
     !formData.items.find(item => item._id === p._id)
+  );
+
+  const filteredCustomers = customers.filter(c => 
+    c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
+    (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (c.phone && c.phone.includes(customerSearch))
   );
 
   const addProduct = (product) => {
@@ -70,8 +89,42 @@ const OrderForm = () => {
   };
 
   const subtotal = formData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 1000 ? 0 : 100;
-  const total = subtotal + shipping;
+  
+  // Calculate Shipping
+  let shipping = 0;
+  let freeShippingApplied = false;
+  let minOrderForFree = 0;
+
+  if (deliveryCharges.length === 0) {
+    // Fallback if no rules exist
+    shipping = 100;
+  } else {
+    const selectedCharge = deliveryCharges.find(c => c._id === selectedChargeId);
+    if (selectedCharge) {
+      shipping = selectedCharge.charge;
+      minOrderForFree = selectedCharge.minOrderForFree;
+      if (minOrderForFree > 0 && subtotal >= minOrderForFree) {
+        shipping = 0;
+        freeShippingApplied = true;
+      }
+    }
+  }
+
+  const total = subtotal + shipping - discount;
+
+  const applyCoupon = async () => {
+    if (!couponCode) return;
+    try {
+      setCouponError('');
+      const res = await api.post('/coupon/apply', { code: couponCode, orderAmount: subtotal });
+      setDiscount(res.data.discount);
+      setAppliedCoupon(res.data.coupon);
+    } catch (err) {
+      setCouponError(err.response?.data?.message || err.message);
+      setDiscount(0);
+      setAppliedCoupon(null);
+    }
+  };
 
   const handleCustomerSelect = (customerId) => {
     const customer = customers.find(c => c._id === customerId);
@@ -103,6 +156,8 @@ const OrderForm = () => {
         },
         paymentMethod: formData.paymentMethod,
         itemsPrice: subtotal, shippingPrice: shipping,
+        discountPrice: discount,
+        couponCode: appliedCoupon ? appliedCoupon.code : undefined,
         totalPrice: total, orderStatus: 'pending', isPaid: false,
       };
       await api.post('/addOrder', orderData);
@@ -120,13 +175,41 @@ const OrderForm = () => {
           <h3 className="font-semibold mb-4">Customer Information</h3>
           <div className="space-y-4">
             {customers.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Select Existing Customer</label>
-                <select value={formData.customerId} onChange={(e) => handleCustomerSelect(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-background border border-input focus:border-primary outline-none text-sm appearance-none cursor-pointer">
-                  <option value="">-- Select or fill manually --</option>
-                  {customers.map(c => <option key={c._id} value={c._id}>{c.fullName} ({c.email})</option>)}
-                </select>
+              <div className="space-y-2 relative">
+                <label className="block text-sm font-medium">Search Existing Customer</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input type="text" value={customerSearch} 
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      setShowCustomerSuggestions(true);
+                    }}
+                    onFocus={() => setShowCustomerSuggestions(true)}
+                    placeholder="Type name, email or phone..."
+                    className="w-full h-10 pl-9 pr-4 rounded-lg bg-background border border-input focus:border-primary outline-none text-sm" />
+                </div>
+                
+                {showCustomerSuggestions && customerSearch && (
+                  <div className="absolute z-20 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredCustomers.length > 0 ? (
+                      filteredCustomers.map(c => (
+                        <div key={c._id} 
+                          onClick={() => {
+                            handleCustomerSelect(c._id);
+                            setCustomerSearch(c.fullName);
+                            setShowCustomerSuggestions(false);
+                          }}
+                          className="p-2 hover:bg-muted cursor-pointer text-sm border-b border-border last:border-0"
+                        >
+                          <p className="font-medium">{c.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{c.phone || c.email}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-sm text-muted-foreground text-center">No customer found</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div>
@@ -258,19 +341,65 @@ const OrderForm = () => {
         {formData.items.length > 0 && (
           <div className="bg-card rounded-xl p-4 shadow-card animate-fade-in" style={{ animationDelay: '100ms' }}>
             <h3 className="font-semibold mb-3">Order Summary</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal ({formData.items.reduce((s, i) => s + i.quantity, 0)} items)</span>
-                <span>৳{subtotal.toFixed(2)}</span>
+            <div className="space-y-4">
+              {/* Delivery Select */}
+              {deliveryCharges.length > 0 ? (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Delivery Area</label>
+                  <select value={selectedChargeId} onChange={(e) => setSelectedChargeId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-background border border-input focus:border-primary outline-none text-sm">
+                    {deliveryCharges.map(charge => (
+                      <option key={charge._id} value={charge._id}>{charge.name} - ৳{charge.charge}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Delivery Area</label>
+                  <div className="w-full h-10 px-3 flex items-center rounded-lg bg-muted border border-input text-sm text-muted-foreground">
+                    Standard Delivery (No rules configured)
+                  </div>
+                </div>
+              )}
+              
+              {/* Coupon */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Discount Coupon</label>
+                <div className="flex gap-2">
+                  <input type="text" value={couponCode} onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="Enter code" className="flex-1 h-10 px-3 rounded-lg bg-background border border-input focus:border-primary outline-none text-sm uppercase" />
+                  <button type="button" onClick={applyCoupon}
+                    className="px-4 h-10 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80">Apply</button>
+                </div>
+                {couponError && <p className="text-xs text-destructive mt-1">{couponError}</p>}
+                {appliedCoupon && <p className="text-xs text-success mt-1">Coupon applied successfully!</p>}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span>{shipping === 0 ? 'Free' : `৳${shipping.toFixed(2)}`}</span>
-              </div>
-              <p className="text-xs text-success">Free shipping on orders over ৳1000</p>
-              <div className="flex justify-between font-semibold text-base pt-2 border-t border-border">
-                <span>Total</span>
-                <span>৳{total.toFixed(2)}</span>
+
+              <div className="space-y-2 text-sm pt-2 border-t border-border">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal ({formData.items.reduce((s, i) => s + i.quantity, 0)} items)</span>
+                  <span>৳{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span>{shipping === 0 ? 'Free' : `৳${shipping.toFixed(2)}`}</span>
+                </div>
+                {minOrderForFree > 0 && !freeShippingApplied && (
+                  <p className="text-[10px] text-muted-foreground text-right">Free shipping over ৳{minOrderForFree}</p>
+                )}
+                {freeShippingApplied && (
+                  <p className="text-[10px] text-success text-right">Free shipping applied!</p>
+                )}
+                {discount > 0 && (
+                  <div className="flex justify-between text-success">
+                    <span>Discount</span>
+                    <span>-৳{discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-base pt-2 border-t border-border">
+                  <span>Total</span>
+                  <span>৳{total.toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>

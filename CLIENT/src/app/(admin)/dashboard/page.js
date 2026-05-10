@@ -190,10 +190,10 @@ const dashboard = async () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{product.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {product.stock} in stock
+                      {product.totalSold || 0} sold • {product.stock} in stock
                     </p>
                   </div>
-                  <span className="font-semibold text-sm">৳{product.price?.toLocaleString()}</span>
+                  <span className="font-semibold text-sm text-success">৳{(product.totalRevenue || 0).toLocaleString()}</span>
                 </div>
               ))
             ) : (

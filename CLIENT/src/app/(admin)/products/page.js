@@ -65,6 +65,10 @@ const Products = () => {
   const [stockFilter, setStockFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name-asc');
   const [deleteProduct, setDeleteProduct] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // Fetch real products from API
   useEffect(() => {
@@ -115,6 +119,17 @@ const Products = () => {
         default: return 0;
       }
     });
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, priceRange, stockFilter, sortBy]);
 
   const handleViewProduct = (productId) => {
     router.push(`/products/${productId}`);
@@ -306,7 +321,7 @@ const Products = () => {
         {/* Products Grid/List */}
         {viewMode === 'grid' ? (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 md:gap-4">
-            {filteredProducts.map((product, index) => (
+            {paginatedProducts.map((product, index) => (
               <ProductCard 
                 key={product.id} 
                 product={product} 
@@ -318,7 +333,7 @@ const Products = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredProducts.map((product, index) => (
+            {paginatedProducts.map((product, index) => (
               <div
                 key={product.id}
                 onClick={() => handleViewProduct(product.id)}
@@ -359,6 +374,31 @@ const Products = () => {
           <div className="text-center py-12">
             <p className="text-muted-foreground mb-4">No products match your filters.</p>
             <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 0 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="text-sm font-medium">
+              Page {currentPage} of {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              Next
+            </Button>
           </div>
         )}
       </div>

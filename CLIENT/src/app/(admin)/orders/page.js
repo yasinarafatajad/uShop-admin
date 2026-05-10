@@ -14,6 +14,10 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -41,6 +45,17 @@ const Orders = () => {
     const matchesFilter = activeFilter === 'All' || order.status.toLowerCase() === activeFilter.toLowerCase();
     return matchesSearch && matchesFilter;
   });
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeFilter]);
 
   if (loading) {
     return (
@@ -88,8 +103,8 @@ const Orders = () => {
           ))}
         </div>
         <div className="space-y-3">
-          {filteredOrders.length > 0 ? (
-            filteredOrders.map((order, index) => (
+          {paginatedOrders.length > 0 ? (
+            paginatedOrders.map((order, index) => (
               <OrderRow key={order.id} order={order} delay={index * 30} />
             ))
           ) : (
@@ -98,6 +113,29 @@ const Orders = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 0 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <button
+              className="px-3 py-1.5 border border-input rounded-md text-sm disabled:opacity-50"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <div className="text-sm font-medium">
+              Page {currentPage} of {totalPages}
+            </div>
+            <button
+              className="px-3 py-1.5 border border-input rounded-md text-sm disabled:opacity-50"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
