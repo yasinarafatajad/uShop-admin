@@ -3,21 +3,23 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { api } from '@/hooks/useApi/api';
 
-const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayNames = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 const SalesBarChart = () => {
   const [salesData, setSalesData] = useState([]);
   const [totalSales, setTotalSales] = useState(0);
-  const todayIndex = new Date().getDay();
+  const todayIndex = (new Date().getDay() + 1) % 7;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const { data } = await api.get('/chartData');
         const weekly = data.weeklySales || [];
-        // Map to day names, fill missing days with 0
+        // Map to day names
+        const dayMap = [7, 1, 2, 3, 4, 5, 6];
+
         const mapped = dayNames.map((name, i) => {
-          const dayData = weekly.find(w => w._id === i + 1); // MongoDB $dayOfWeek: 1=Sun
+          const dayData = weekly.find(w => w._id === dayMap[i]);
           return { name, sales: dayData?.sales || 0 };
         });
         setSalesData(mapped);

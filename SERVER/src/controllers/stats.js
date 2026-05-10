@@ -34,7 +34,7 @@ export const getStats = async (req, res) => {
     }
 }
 
-// Dashboard data: recent orders + top products
+// Dashboard data: recent orders + top products by revenue
 export const getDashboardData = async (req, res) => {
     try {
         // Recent orders (last 5)
@@ -43,11 +43,37 @@ export const getDashboardData = async (req, res) => {
             .limit(5)
             .lean();
 
-        // Top products by stock (most available)
-        const topProducts = await ProductModel.find({ isActive: true })
-            .sort({ stock: -1 })
-            .limit(5)
-            .lean();
+        // Top products by revenue (from order items)
+        const topProductsAgg = await OrderModel.aggregate([
+            { $match: { orderStatus: { $ne: 'cancelled' } } },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: '$items.product',
+                    totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+                    totalSold: { $sum: '$items.quantity' },
+                    name: { $first: '$items.name' },
+                    image: { $first: '$items.image' },
+                }
+            },
+            { $sort: { totalRevenue: -1 } },
+            { $limit: 5 }
+        ]);
+
+        // Enrich with current product data
+        const topProducts = [];
+        for (const item of topProductsAgg) {
+            const product = await ProductModel.findById(item._id).lean();
+            topProducts.push({
+                _id: item._id,
+                title: product?.title || item.name,
+                images: product?.images || (item.image ? [{ url: item.image }] : []),
+                price: product?.price || 0,
+                stock: product?.stock || 0,
+                totalRevenue: item.totalRevenue,
+                totalSold: item.totalSold,
+            });
+        }
 
         res.status(200).json({ recentOrders, topProducts });
     } catch (err) {

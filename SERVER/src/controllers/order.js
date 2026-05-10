@@ -1,6 +1,7 @@
 import OrderModel from '../models/order.js'
 import customerModel from '../models/customer.js'
 import ProductModel from '../models/product.js'
+import Coupon from '../models/coupon.js'
 
 export const GetOrder = async (req, res) => {
     try {
@@ -35,6 +36,7 @@ export const AddOrder = async (req, res) => {
         itemsPrice,
         shippingPrice,
         discountPrice,
+        couponCode,
         totalPrice,
         orderStatus,
         isPaid
@@ -78,6 +80,7 @@ export const AddOrder = async (req, res) => {
             itemsPrice,
             shippingPrice,
             discountPrice,
+            couponCode,
             totalPrice,
             orderStatus,
             isPaid
@@ -109,6 +112,14 @@ export const AddOrder = async (req, res) => {
             }
         }
 
+        // Increase coupon usage count if used
+        if (couponCode) {
+            await Coupon.findOneAndUpdate(
+                { code: couponCode },
+                { $inc: { usedCount: 1 } }
+            );
+        }
+
         res.status(201).json({ success: true, order });
     } catch (err) {
         console.log('Order adding failed :', err.message);
@@ -126,6 +137,13 @@ export const DeleteOrder = async (req, res) => {
                 await ProductModel.findByIdAndUpdate(
                     item.product,
                     { $inc: { stock: item.quantity || 1 } }
+                );
+            }
+            // Restore coupon limit if used
+            if (result.couponCode) {
+                await Coupon.findOneAndUpdate(
+                    { code: result.couponCode },
+                    { $inc: { usedCount: -1 } }
                 );
             }
             res.status(200).json({ success: true, message: 'Order deleted' });
@@ -153,12 +171,18 @@ export const UpdateOrder = async (req, res) => {
             { new: true, runValidators: true }
         );
 
-        // If order is being cancelled, restore stock
+        // If order is being cancelled, restore stock and coupon usage
         if (req.body.orderStatus === 'cancelled' && oldOrder.orderStatus !== 'cancelled') {
             for (const item of oldOrder.items || []) {
                 await ProductModel.findByIdAndUpdate(
                     item.product,
                     { $inc: { stock: item.quantity || 1 } }
+                );
+            }
+            if (oldOrder.couponCode) {
+                await Coupon.findOneAndUpdate(
+                    { code: oldOrder.couponCode },
+                    { $inc: { usedCount: -1 } }
                 );
             }
         }
