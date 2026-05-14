@@ -39,7 +39,10 @@ export const AddOrder = async (req, res) => {
         couponCode,
         totalPrice,
         orderStatus,
-        isPaid
+        isPaid,
+        senderNumber,
+        trxId,
+        paymentScreenshot
     } = req.body;
 
     try {
@@ -83,7 +86,10 @@ export const AddOrder = async (req, res) => {
             couponCode,
             totalPrice,
             orderStatus,
-            isPaid
+            isPaid,
+            senderNumber,
+            trxId,
+            paymentScreenshot
         };
 
         const order = await OrderModel.create(orderData);

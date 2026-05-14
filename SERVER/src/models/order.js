@@ -45,7 +45,10 @@ const orderSchema = new mongoose.Schema(
       default: "pending"
     },
 
-    isPaid: { type: Boolean, default: false }
+    isPaid: { type: Boolean, default: false },
+    senderNumber: String,
+    trxId: String,
+    paymentScreenshot: String,
   },
   { timestamps: true , versionKey: false}
 );
