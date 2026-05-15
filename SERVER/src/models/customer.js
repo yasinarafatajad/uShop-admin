@@ -23,6 +23,11 @@ const customerSchema = new mongoose.Schema(
         phone: {
             type: String,
         },
+        
+        image: {
+            type: String,
+            default: "https://media.istockphoto.com/id/1332100919/vector/man-icon-black-icon-person-symbol.jpg",
+        },
 
         // Authentication
         password: {
@@ -31,6 +36,14 @@ const customerSchema = new mongoose.Schema(
             default: "00000000",
             minlength: 6,
             select: false, // Do not return password by default
+        },
+        
+        resetPasswordOtp: {
+            type: String,
+        },
+        
+        resetPasswordExpires: {
+            type: Date,
         },
 
         role: {
