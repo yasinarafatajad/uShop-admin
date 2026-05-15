@@ -19,7 +19,32 @@ export const GetOrder = async (req, res) => {
 
 export const GetAllOrder = async (req, res) => {
     try {
-        const result = await OrderModel.find().sort({ createdAt: -1 });
+        const { email, phone } = req.query;
+        let query = {};
+
+        if (email || phone) {
+            const orConditions = [];
+            if (email) orConditions.push({ 'shippingAddress.email': email });
+            if (phone) orConditions.push({ 'shippingAddress.phone': phone });
+            
+            // Also search by linked user's email/phone if possible
+            const customers = await customerModel.find({
+                $or: [
+                    { email: email || '____' },
+                    { phone: phone || '____' }
+                ]
+            });
+            
+            if (customers.length > 0) {
+                orConditions.push({ user: { $in: customers.map(c => c._id) } });
+            }
+
+            if (orConditions.length > 0) {
+                query.$or = orConditions;
+            }
+        }
+
+        const result = await OrderModel.find(query).sort({ createdAt: -1 });
         res.status(200).json(result);
     } catch (err) {
         console.log(err.message);
