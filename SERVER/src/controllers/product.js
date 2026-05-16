@@ -12,7 +12,6 @@ export const AddProduct = async (req, res) => {
     price,
     compareAtPrice,
     stock,
-    isActive = true,
     brand,
     tags = [],
     status = "draft",
@@ -30,7 +29,6 @@ export const AddProduct = async (req, res) => {
     price,
     compareAtPrice,
     stock,
-    isActive,
     brand,
     tags,
     status,
@@ -50,7 +48,7 @@ export const AddProduct = async (req, res) => {
 export const GetProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await ProductModel.findOne({ _id: id });
+    const result = await ProductModel.findOne({ _id: id, status: "active" });
     if (!result) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
@@ -63,7 +61,7 @@ export const GetProduct = async (req, res) => {
 
 export const GetAllProducts = async (req, res) => {
   try {
-    const AllProducts = await ProductModel.find().sort({ createdAt: -1 });
+    const AllProducts = await ProductModel.find({ status: "active" }).sort({ createdAt: -1 });
     res.status(200).json(AllProducts);
   } catch (err) {
     console.log(err.message);
