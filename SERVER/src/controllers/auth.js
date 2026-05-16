@@ -198,9 +198,12 @@ export const forgotPassword = async (req, res) => {
         // Generate 4 digit OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
         
-        user.resetPasswordOtp = otp;
-        user.resetPasswordExpires = Date.now() + 5 * 60 * 1000; // 10 minutes
-        await user.save();
+        await customerModel.findByIdAndUpdate(customerId, {
+            $set: {
+                resetPasswordOtp: otp,
+                resetPasswordExpires: new Date(Date.now() + 5 * 60 * 1000)
+            }
+        });
 
         if (method === 'whatsapp' && user.phone) {
             try {
@@ -262,10 +265,14 @@ export const resetPassword = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        user.password = hashedPassword;
-        user.resetPasswordOtp = undefined;
-        user.resetPasswordExpires = undefined;
-        await user.save();
+        
+        await customerModel.findByIdAndUpdate(user._id, {
+            $set: {
+                password: hashedPassword,
+                resetPasswordOtp: undefined,
+                resetPasswordExpires: undefined
+            }
+        });
 
         res.status(200).json({ success: true, message: 'Password reset successful' });
     } catch (error) {
@@ -289,8 +296,10 @@ export const changePassword = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        user.password = hashedPassword;
-        await user.save();
+        
+        await customerModel.findOneAndUpdate({ email }, {
+            $set: { password: hashedPassword }
+        });
 
         res.status(200).json({ success: true, message: 'Password changed successfully' });
     } catch (error) {
