@@ -48,7 +48,7 @@ export const AddProduct = async (req, res) => {
 export const GetProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await ProductModel.findOne({ _id: id, status: "active" });
+    const result = await ProductModel.findOne({ _id: id });
     if (!result) {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
