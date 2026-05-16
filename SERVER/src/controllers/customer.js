@@ -68,9 +68,22 @@ export const deleteCustomer = async (req, res) => {
 export const updateCustomer = async (req, res) => {
     const { id } = req.params;
     try {
+        const updateData = { ...req.body };
+        
+        // If address is a string (e.g. from a simple textarea), convert it to object
+        if (typeof updateData.address === 'string') {
+            updateData.address = {
+                street: updateData.address,
+                city: '',
+                district: '',
+                postalCode: '',
+                country: 'Bangladesh'
+            };
+        }
+
         const result = await customerModel.findByIdAndUpdate(
             id,
-            { $set: req.body },
+            { $set: updateData },
             { new: true, runValidators: true }
         );
         if (result) {

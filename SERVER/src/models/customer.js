@@ -23,6 +23,11 @@ const customerSchema = new mongoose.Schema(
         phone: {
             type: String,
         },
+        
+        image: {
+            type: String,
+            default: "https://media.istockphoto.com/id/1332100919/vector/man-icon-black-icon-person-symbol.jpg",
+        },
 
         // Authentication
         password: {
@@ -31,6 +36,14 @@ const customerSchema = new mongoose.Schema(
             default: "00000000",
             minlength: 6,
             select: false, // Do not return password by default
+        },
+        
+        resetPasswordOtp: {
+            type: String,
+        },
+        
+        resetPasswordExpires: {
+            type: Date,
         },
 
         role: {
@@ -52,14 +65,14 @@ const customerSchema = new mongoose.Schema(
 
         // Address (can expand later)
         address: {
-            street: String,
-            city: String,
-            district: String,
-            postalCode: String,
-            country: {
-                type: String,
-                default: "Bangladesh",
-            },
+            type: mongoose.Schema.Types.Mixed,
+            default: {
+                street: '',
+                city: '',
+                district: '',
+                postalCode: '',
+                country: 'Bangladesh'
+            }
         },
 
         // Order Relation
@@ -72,5 +85,20 @@ const customerSchema = new mongoose.Schema(
     },
     { timestamps: true, versionKey: false }
 );
+
+// Pre-save hook to ensure address is an object
+customerSchema.pre('save', function (next) {
+    if (typeof this.address === 'string') {
+        const addressString = this.address;
+        this.address = {
+            street: addressString,
+            city: '',
+            district: '',
+            postalCode: '',
+            country: 'Bangladesh'
+        };
+    }
+    next();
+});
 
 export default mongoose.model('Customer' , customerSchema);
