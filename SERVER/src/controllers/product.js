@@ -61,7 +61,7 @@ export const GetProduct = async (req, res) => {
 
 export const GetAllProducts = async (req, res) => {
   try {
-    const AllProducts = await ProductModel.find({ status: "active" }).sort({ createdAt: -1 });
+    const AllProducts = await ProductModel.find().sort({ createdAt: -1 });
     res.status(200).json(AllProducts);
   } catch (err) {
     console.log(err.message);
